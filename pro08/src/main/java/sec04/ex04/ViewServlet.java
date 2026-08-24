@@ -1,5 +1,20 @@
 package sec04.ex04;
 
+// 주제 : HTML 출력 코드를 메소드로 분리하여 가독성을 높인 ViewServlet
+
+/*
+    이 서블릿의 전체 처리 흐름
+
+    MemberServlet에서 포워딩됨 (request 안에 조회 결과 배열이 담겨 있음)
+        |
+        v
+    request에서 ArrayList 배열 꺼내기 -> HTML 표 형태로 출력 응답
+
+    가독성 개선 포인트
+    1. 표의 제목 행 출력 / 회원 한 명 행 출력을 각각의 메소드로 분리
+    2. List<MemberVO> 제네릭 표기 -> (MemberVO) 강제 형변환 코드 삭제
+*/
+
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.List;
@@ -10,86 +25,100 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-/*
-   두번쨰 서블릿 ViewServlet 역할
-   - 첫번째 서블릿인 MemberServlet이 조회 작업한 정보를 HttpServletRequest에 바인딩 한후 
-     공유 받아 브라우저로 응답(출력) 하는 서블릿.
-*/
-
 @WebServlet("/viewMembers2")
-public class ViewServlet extends HttpServlet{
+public class ViewServlet extends HttpServlet {
+
+	// GET, POST 요청 모두 doHandle 메소드 하나로 모아서 처리
+	@Override
+	protected void doGet(HttpServletRequest request, HttpServletResponse response)
+						throws ServletException, IOException {
+		doHandle(request, response);
+	}
 
 	@Override
-	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-		
-		//요청한 데이터 한글처리
+	protected void doPost(HttpServletRequest request, HttpServletResponse response)
+						throws ServletException, IOException {
+		doHandle(request, response);
+	}
+
+	//================================================================
+	// 화면 출력 담당 : 조회 결과 배열을 꺼내 HTML 표로 응답
+	//================================================================
+	@SuppressWarnings("unchecked")
+	protected void doHandle(HttpServletRequest request, HttpServletResponse response)
+							throws ServletException, IOException {
+
+		// 요청 데이터의 한글 깨짐 방지 설정
 		request.setCharacterEncoding("UTF-8");
-			
-		//첫번쨰 서블릿 MemberServlet에서 HttpServletRequest객체 메모리에 바인딩한
-		//조회된 MemberVO객체들이 저장된 ArrayList배열 꺼내오기 
-		List list = (List)request.getAttribute("membersList");
-				
-		/*
-	    반환받은 ArrayList 배열 모습 (조회된 레코드(행) 1개당 MemberVO 객체 1개)
-	    [ new MemberVO(), new MemberVO(), new MemberVO() ]
-	         		0           1               2          <---- index
-		 */		
-		//3.2.1. 브라우저로 응답할 데이터의 유형(MIME-TYPE)을 HTML로 , 인코딩을 UTF-8로 설정
+
+		// MemberServlet에서 바인딩한 조회 결과 ArrayList 배열 꺼내오기
+		List<MemberVO> list = (List<MemberVO>) request.getAttribute("membersList");
+
+		// 응답 데이터 유형(HTML)과 인코딩 방식(UTF-8) 설정
 		response.setContentType("text/html; charset=utf-8");
-		
-		//3.2.2. 요청한 클라이언트의 브라우저와 연결된 출려스트림(PrintWriter) 객체 얻기
-		PrintWriter  out = response.getWriter();
-		
-		//3.3. 조회된 회원 정보를 HTML 표 형태로 만들어 브라우저에 출력(응답)
+
+		// 웹브라우저로 데이터를 내보낼 출력스트림 얻기
+		PrintWriter out = response.getWriter();
+
+		/*
+		    출력할 HTML 표의 완성 모습
+
+		    +--------+----------+------+--------+--------+------+------+
+		    | 아이디 | 비밀번호 | 이름 | 이메일 | 가입일 | 삭제 | 수정 |
+		    +--------+----------+------+--------+--------+------+------+
+		    | hong   | 1234     | ...  | ...    | ...    | 삭제 | 수정 |   <- 회원 수만큼 반복
+		    +--------+----------+------+--------+--------+------+------+
+		*/
 		out.print("<html>");
 		out.print("<body>");
-			out.print("<table border=1>");
-				// 표의 제목 행 출력
-				out.print("<tr align='center' bgcolor='lightgreen'>");
-					out.print("<th>아이디</th>");
-					out.print("<th>비밀번호</th>");
-					out.print("<th>이름</th>");
-					out.print("<th>이메일</th>");
-					out.print("<th>가입일</th>");
-					out.print("<th>삭제</th>");
-					out.print("<th>수정</th>");				
-				out.print("</tr>");
+		out.print("<table border=1>");
 
-				/*
-			    반환받은 ArrayList 배열 모습 (조회된 레코드(행) 1개당 MemberVO 객체 1개)
-			    [ new MemberVO(), new MemberVO(), new MemberVO() ]
-			         		0           1               2          <---- index
-				 */		
-				
-				// ArrayList에 저장된 MemberVO 객체 개수(list.size())만큼 반복 출력
-				for (int i = 0; i < list.size(); i++) {
+		// 표의 제목 행 1줄 출력
+		printTableHeader(out);
 
-					// i번 칸의 MemberVO 객체를 꺼내 변수에 저장
-					// (raw 타입 List라서 Object로 반환되므로 MemberVO로 형변환 필요)
-					MemberVO memberVO = (MemberVO) list.get(i);
+		// 배열에 저장된 MemberVO 객체 수만큼 반복하며 회원 한 명씩 행 출력
+		for (int i = 0; i < list.size(); i++) {
+			printMemberRow(out, list.get(i));
+		}
 
-					// 회원 1명 = 표의 행 1개로 출력 (getter로 값을 꺼내 <td>에 삽입)
-					out.print("<tr align='center'>");
-						out.print("<td>" + memberVO.getId() + "</td>");
-						out.print("<td>" + memberVO.getPwd() + "</td>");
-						out.print("<td>" + memberVO.getName() + "</td>");
-						out.print("<td>" + memberVO.getEmail() + "</td>");
-						out.print("<td>" + memberVO.getJoinDate() + "</td>");
-						out.print("<td><a href='/pro08/member4?command=delMember&id="+memberVO.getId()+"'>삭제</a></td>");
-						out.print("<td><a href='/pro08/member4?command=modMember&id="+memberVO.getId()+"'>수정</a></td>");
-					out.print("</tr>");
-				}
-
-			out.print("</table>");
-			
-			out.print("<a href='/pro08/memberForm.html'>회원가입</a>");
-			
+		out.print("</table>");
+		out.print("<a href='/pro08/memberForm.html'>회원가입</a>");
 		out.print("</body>");
-	out.print("</html>");		
-		
+		out.print("</html>");
 	}
-		
-}
 
+	//================================================================
+	// 1. 표의 제목 행 출력
+	//================================================================
+	private void printTableHeader(PrintWriter out) {
 
+		out.print("<tr align='center' bgcolor='lightgreen'>");
+		out.print("<th>아이디</th>");
+		out.print("<th>비밀번호</th>");
+		out.print("<th>이름</th>");
+		out.print("<th>이메일</th>");
+		out.print("<th>가입일</th>");
+		out.print("<th>삭제</th>");
+		out.print("<th>수정</th>");
+		out.print("</tr>");
+	}
 
+	//================================================================
+	// 2. 회원 한 명의 정보 행 출력 (삭제/수정 요청 링크 포함)
+	//================================================================
+	private void printMemberRow(PrintWriter out, MemberVO vo) {
+
+		out.print("<tr align='center'>");
+		out.print("<td>" + vo.getId() + "</td>");
+		out.print("<td>" + vo.getPwd() + "</td>");
+		out.print("<td>" + vo.getName() + "</td>");
+		out.print("<td>" + vo.getEmail() + "</td>");
+		out.print("<td>" + vo.getJoinDate() + "</td>");
+
+		// 클릭 시 MemberServlet(/member4)으로 삭제/수정 요청을 보내는 링크
+		out.print("<td><a href='/pro08/member5?command=delMember&id=" + vo.getId() + "'>삭제</a></td>");
+		out.print("<td><a href='/pro08/member5?command=modMember&id=" + vo.getId() + "'>수정</a></td>");
+		out.print("</tr>");
+	}
+
+} // class ViewServlet 끝
