@@ -1,5 +1,5 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8"
-	pageEncoding="UTF-8"%>
+    pageEncoding="UTF-8"%>
 <!DOCTYPE html>
 <html>
 <head>
@@ -21,31 +21,25 @@
 
  </script>
  <![endif]-->
+ <%--
+ 	[로그인 실패 안내]
+ 	MemberController 서블리이 디스패처방식으로 포워딩할때 공유 받은 request 내장객체에 담아 둔 
+ 	"loginMsg" 키에 대응하는 ,실패 메세지 값이 있으면  경고창으로 브라우저에 보여준다.
+  --%>
+<%
+	String loginMsg	 = (String)request.getAttribute("loginMsg");
+	
+	if(loginMsg != null){ //로그인 실패로 인한 request에 바인딩한 경고메세지가 값으로 저장되어 있다면?
+%>		
+		<script>  alert("<%=loginMsg%>"); </script>				
+<%			
+	}
+%>  
 </head>
 <body>
 	<div id="wrap">
 		<!-- 헤더들어가는 곳 -->
-		<header>
-			<div id="login">
-				<a href="../member/login.html">login</a> | <a
-					href="../member/join.html">join</a>
-			</div>
-			<div class="clear"></div>
-			<!-- 로고들어가는 곳 -->
-			<div id="logo">
-				<img src="../images/logo.gif" width="265" height="62" alt="Fun Web">
-			</div>
-			<!-- 로고들어가는 곳 -->
-			<nav id="top_menu">
-				<ul>
-					<li><a href="../index.html">HOME</a></li>
-					<li><a href="../company/welcome.html">COMPANY</a></li>
-					<li><a href="#">SOLUTIONS</a></li>
-					<li><a href="../center/notice.html">CUSTOMER CENTER</a></li>
-					<li><a href="#">CONTACT US</a></li>
-				</ul>
-			</nav>
-		</header>
+		<%@ include file="../inc/top.jsp" %>
 		<!-- 헤더들어가는 곳 -->
 
 		<!-- 본문들어가는 곳 -->
@@ -63,7 +57,11 @@
 		<!-- 본문내용 -->
 		<article>
 			<h1>Login</h1>
-			<form action="" id="join">
+			
+			<form action="login.do" id="join" method="post">
+				<%-- action : 전송 목적지 = 컨트롤러의 로그인 기능 (login.do)
+			         method="post" : 비밀번호가 주소창에 노출되지 않게 본문으로 전송 --%>
+			     
 				<fieldset>
 					<legend>Login Info</legend>
 					<label>User ID</label> <input type="text" name="id"><br>
@@ -71,8 +69,8 @@
 				</fieldset>
 				<div class="clear"></div>
 				<div id="buttons">
-					<input type="button" value="Submit" class="submit"> <input
-						type="button" value="Cancel" class="cancel">
+					<input type="submit" value="로그인" class="submit"> 
+					<input type="reset" value="취소" class="cancel">
 				</div>
 			</form>
 		</article>
@@ -81,20 +79,14 @@
 
 		<div class="clear"></div>
 		<!-- 푸터들어가는 곳 -->
-		<footer>
-			<hr>
-			<div id="copy">
-				All contents Copyright 2011 FunWeb 2011 FunWeb Inc. all rights
-				reserved<br> Contact mail:funweb@funwebbiz.com Tel +82 64 123
-				4315 Fax +82 64 123 4321
-			</div>
-			<div id="social">
-				<img src="../images/facebook.gif" width="33" height="33"
-					alt="Facebook"> <img src="../images/twitter.gif" width="34"
-					height="34" alt="Twitter">
-			</div>
-		</footer>
+		<%@ include file="../inc/bottom.jsp" %>
 		<!-- 푸터들어가는 곳 -->
 	</div>
 </body>
 </html>
+
+
+
+
+
+
