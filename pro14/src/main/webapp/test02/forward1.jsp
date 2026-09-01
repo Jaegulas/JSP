@@ -18,7 +18,7 @@
 	   
 	/* 5. member1.jsp 페이지로 디스패처방식으로 포워딩시 request, response 내장객체 공유 */
 	
-	   request.getRequestDispatcher("member1.jsp").forward(request, response);
+	//   request.getRequestDispatcher("member1.jsp").forward(request, response);
 	
 %>
 	   <jsp:forward  page="member1.jsp"/>
