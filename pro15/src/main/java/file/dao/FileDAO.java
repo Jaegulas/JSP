@@ -152,7 +152,7 @@ public class FileDAO {
 	  이 메소드가 필요한 이유
 		 -> 같은 이름의 파일을 두 번 업로드하면 서버에는 보고서1.hwp 처럼 숫자가 붙어 저장됩니다.
 		 -> 다운로드 요청하는 사용자에게는 원래 이름인 보고서.hwp 로 다운로드되어야 하므로
-		    실제 파일명으로 원본 파일명을 다시 찾아와야 합니다.
+		    실제 파일명으로 원본 파일명을 다시 조회해서 찾아와야 합니다.
 	 */
 	public String selectOriginName(String fileRealName) {
 		
@@ -169,57 +169,71 @@ public class FileDAO {
 			//4. select문을 실행해서 조회 결과를 ResultSet객체에 담아 얻기 
 			try(ResultSet rs = pstmt.executeQuery()){
 				
+				//5. 조회된 레코드가 한 줄이라도 있으면 원본 파일명을 반환 
+				if(rs.next()) {
+					return rs.getString("filename");   // <===== 다운로드할 파일명으로 조회한 원본파일명 
+				}
 			}		
 			
 		}catch(Exception e) {
 			e.printStackTrace();
 		}
 		//6. 조회된 레코드가 없거나 예외가 발생했으면 null을 반환
-		//	 이 메소드를 호출한 쪽(FileDownloadServlet.java 서블릿의 doGet메소드 안쪽)에서 null을 검사해 실제파일명을 그대로 사용되도록 처리
+		//   이 메소드를 호출한 쪽(FileDownloadServlet.java 서블릿의 doGet메소드 안쪽)에서  null을 검사해 실제파일명을 그대로 사용되도록 처리함
 		return null;
-		
-	} //selectOriginName 메소드 끝
+			
+	} //selectOriginName 메소드 끝 
 	
-	/* 8. 다운로드 할때 마다 해당 파일의 다운로드 횟수를 1 증가 시키는 메소드
 	
-		  매개변수 fileRealName : 다운로드를 시도한 파일의 실제 파일명 전달 받음
-		  반환값				  : UPDATE(수정)에 성공하면 1, 실패하면 -1
 	
-		  참고. FileDownloadServlet.java의 doGet메소드 안에서 호출하는 메소드 입니다.
-	*/
+	/* 8. 다운로드 할때 마다 해당 파일의 다운로드 횟수를 1 증가 시키는 메소드 
+	 
+	 	  매개변수 fileRealName : 다운로드를 시도한 파일의 실제 파일명 전달 받음 
+	 	  반환값                : UPDATE(수정)에 성공하면 1,  실패하면 -1 
+	 	  
+	 	  참고. FileDownloadServlet.java의 doGet메소드 안에서 호출하는 메소드 입니다.
+	 */
 	public int hit(String fileRealName) {
 		
-		/*
-			참고. UPDATE 작성 방법
+		/*참고. UPDATE 작성 방법
 			
-				 update 테이블명 set 수정할값이저장될_열명 = 수정할값, ....
+				 update 테이블명 set 수정할값이저장될_열명 = 수정할값, ......
 				 where  조건열명 = 조건값;
 				 
+			downloadcount = downloadcount + 1 의 의미
+			 -> 현재 열에 저장되어 있는 값을 읽어서 1을 더한 값으로 다시 저장하라는 뜻입니다.
+			 -> 자바에서 값을 읽어와 1을 더해 다시 update하는 방식보다 안전합니다.
+			    (여러 사용자가 동시에 다운로드해도 횟수가 정확하게 누적되기 때문)
+
+			주의. where절을 빼먹으면 file테이블의 모든 행의 다운로드 횟수가 함께 증가합니다.
 		*/
+		
 		//1. 다운로드 횟수 1증가 시키는 update 문장 만들기
 		String sql = "update file set downloadcount = downloadcount + 1 "
-				+ "where filerealname = ?";
+				   + "where filerealname = ?";
 		
 		//2. Connection DB연결 통로 빌리기 -> update문을 미리로드한 PreparedStatement 실행 객체 얻기
-		try(Connection conn = this.getConnection();
-			PreparedStatement pstmt = conn.prepareStatement(sql)){
+		try(Connection conn = this.getConnection();   
+		    PreparedStatement pstmt = conn.prepareStatement(sql)){
 			
-			//3. ? 자리에 조건값인 실제 다운로드할 파일명 채우기
+			//3. ? 자리에 조건값인 실제 다운로드할 파일명 채우기 
 			pstmt.setString(1, fileRealName);
 			
 			//4. 완성된 update 전체 문장을 file 테이블에 전송해서 실행!
 			//   반환값 - 수정된 행의 갯수를 반환합니다. (update 구문 실행 성공시 1반환)
-			return pstmt.executeUpdate();
-		//  return 1; 
-			
+			return  pstmt.executeUpdate(); 
+		//  return  1;	
+				
 		}catch (Exception e) {
 			e.printStackTrace();
 		}
 		
-		//5. 예외가 발생해서 update 수정에 실패 했으면
+		//5. 예외가 발생해서 update 수정에 실패 했으면 
 		//   개발자가 정한 -1 값 FileDownloadServlet.java의 doGet메소드 안으로 반환
 		return -1;
-	}
+		
+	} //hit 메소드 끝 
+	
 	
 
 } //FileDAO 클래스 끝

@@ -99,71 +99,88 @@ public class FileDownloadServlet extends HttpServlet{
 		String fileName = fileDao.selectOriginName(fileRealName);
 		
 		/*7.2. DB에 원본 파일명이 없으면 다운로드시킬 실제 파일명을 그대로 사용*/
-		//	   이렇게 처리 해야 DB 기록 없어도 다운로드 자체는 정상 동작 합니다.
+		//     이렇게 처리 해야 DB 기록 없어도 다운로드 자체는 정상 동작 합니다.
 		if(fileName == null) {
 			fileName = fileRealName;
 		}
 		
 		/*8. file 테이블의 downloadcount 열의 값을 1증가 시키기(다운로드 시도한 횟수 1증가 시키기)*/
-		//	 update 문장의 내용은 FileDAO만 알고 있고 이 서블릿은 알지 못합니다.
-		fileDao.hit(fileRealName); 
+		//   update 문장의 내용은 FileDAO만 알고 있고 이 서블릿은 알지 못합니다.
+		fileDao.hit(fileRealName);
 		
 		/*
 		참고. 응답 헤더(header)란?
-		
+
 			브라우저에게 "지금부터 보내는 내용을 이렇게 처리해라" 라고 알려주는 지시서 입니다.
-			
+
 			중요. 헤더는 반드시 아래 10.의 실제 파일 내용을 내보내기 "전에" 설정해야 합니다.
-				 내용을 먼저 내보내면 헤더 설정이 무시됩니다.
+			     내용을 먼저 내보내면 헤더 설정이 무시됩니다.
 		*/
-		
-		/* 9.1. 응답할 데이터의 유형(MIME-TYPE)를 지정
+		/* 9.1. 응답할 데이터의 유형(MIME-TYPE)를 지정 
 				application/octet-stream : 종류를 알 수 없는 이진 데이터라는 뜻
 				이렇게 지정해야 브라우저가 화면에 열지 않고 파일로 저장합니다.
 				만약 text/html로 지정하면 파일 내용이 화면에 깨진 글자로 표시됩니다.
-		
 		*/
 		response.setContentType("application/octet-stream");
 		
-		/*9.2. 응답할 데이터의 전체 크기를 byte 단위로 브라우저에게 알려주기
-		 	   크기를 알려줘야 브라우저가 다운로드 진행률과 남은 시간을 표시할 수 있습니다.*/
+		/*9.2. 응답할 데이터의 전체 크기를 byte 단위로 블라우저에게 알려주기 
+		       크기를 알려줘야 브라우저가 다운로드 진행률과 남은 시간을 표시할 수 있습니다.*/
 		response.setContentLengthLong(downFile.length());
 		
-		
-		/*9.3. 다운로드할 한글 파일명이 깨지지 않도록 URL 인코딩 처리*/
+		/* 참고. 다운로드할 파일의 한글 파일명 처리
+
+			응답 헤더에는 영문과 숫자만 담을 수 있습니다.
+			따라서 한글 파일명을 그대로 넣으면 ???.hwp 처럼 깨져서 저장됩니다.
+
+			URLEncoder.encode(문자열, "UTF-8")
+			 -> 한글을 %EB%B3%B4 같은 영문 기호로 변환해 줍니다.
+
+			replaceAll("\\+", "%20")
+			 -> URLEncoder는 공백을 + 기호로 바꾸는데
+			    헤더에서는 +가 공백으로 되돌아가지 않고 + 글자 그대로 남습니다.
+			 -> 그래서 공백을 뜻하는 %20으로 다시 바꿔줍니다.
+		 */
+		/*9.3. 다운로드할 한글 파일명이 꺠지지 않도록 URL 인코딩 처리*/
 		String encodeName = URLEncoder.encode(fileName, "UTF-8").replaceAll("\\+", "%20");
 		
-		/*9.4. 다운로드 지시 헤더 설정
-		 
-		
+		/* 9.4. 다운로드 지시 헤더 설정
+		   attachment  : 화면에 열지 말고 파일로 저장하라는 지시
+		   filename    : 구형 브라우저가 읽는 다운로드 파일명
+		   filename*   : 한글을 지원하는 최신 브라우저가 읽는 다운로드 파일명
+		   두 가지를 함께 넣어야 어떤 브라우저에서도 다운로드 파일명이 깨지지 않습니다.		
 		*/
 		response.setHeader("Content-Disposition", 
-						   "attachment; filename=\"" + encodeName + "\"; filename*=UTF-8''" + encodeName);
+				            "attachment; filename=\"" + encodeName + "\"; filename*=UTF-8''" + encodeName);
 		
 		/* 10. 톰캣 서버 하드디스크 공간 upload폴더에서 파일을 읽어서 브라우저로 그대로 내보내기 (다운로드)*/
-		try(FileInputStream fis = new FileInputStream(downFile); 
-			OutputStream  os  = response.getOutputStream()){
+		try(FileInputStream fis = new FileInputStream(downFile); //톰캣 서버 다운로드할 파일의 내용을 읽어들일 통로 
+			OutputStream  os = response.getOutputStream()){      // 브라우저로 읽어들인 파일 정보 내보내는 출력 스트림 통로 
 			
+			/*10.1. 한번에 8KB 씩 읽어 옯겨 저장할 임시 저장공간 만들기*/
 			byte[] buffer = new byte[8192];
 			
+			/*10.2. 이번 회차에 실제로 파일에서 읽어온 바이트 수를 저장할 변수 선언*/
 			int readCount;
 			
+			/*10.3. read() 메소드는 읽어온 바이트 수를 반환하고   
+			 *      더이상 파일에서 읽을 내용이 없으면 -1을 반환하므로 그때까지 계속 반복 */
 			while( (readCount = fis.read(buffer)) != -1 ) {
 				
-				/*10.4. 실제 읽어 온 바이트수 만큼만 브라우저로 내보내기 */
+				/*10.4. 실제 읽어 온 바이트수  만큼만 브라우저로 내보내기 
+				  		os.write(buffer) 라고 쓰면 안 되는 이유
+				  		-> 마지막 회차에는 8192byte를 다 못 채우는데
+				  		   배열 전체를 내보내면 앞 회차의 쓰레기 값이 함께 전송되어 파일이 손상됩니다.*/
 				os.write(buffer, 0, readCount);
 			}
-			/*10.5. 통로에 남아 있는 마지막 조각 데이터까지 모두 강제로 브라우저로 내보내기 */
+			
+			/* 10.5 통로에 남아 있는 마지막 조각 데이터까지 모두 강제로 브라우저로 내보내기 */
 			os.flush();
 			
 		} //end try
-		
-		
+	
 	} //doGet 메소드 끝 
 	
-	
-	
-}
+} //FileDownloadServlet클래스 끝
 
 
 
