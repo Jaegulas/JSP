@@ -22,6 +22,7 @@ import javax.sql.DataSource;
  ** 이미 작성된 isExisted() 를 그대로 참고하면 된다. **
 ================================================================
 */
+
 public class MemberDAO {
 
 	// 커넥션풀에서 연결을 꺼내 줄 DataSource 변수 dataFactory 선언
